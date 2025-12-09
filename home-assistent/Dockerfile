@@ -1,22 +1,20 @@
 # ============================
-# 1. Build da aplicação
+# 1. Build
 # ============================
-FROM eclipse-temurin:25-jdk AS build
+FROM maven:3.9.8-eclipse-temurin-25 AS build
 
 WORKDIR /app
 
-COPY mvnw .
-COPY .mvn .mvn
 COPY pom.xml .
-RUN ./mvnw -q -e -DskipTests dependency:resolve
+RUN mvn -q -e -DskipTests dependency:resolve
 
-COPY . .
+COPY src ./src
 
-RUN ./mvnw -q -e -DskipTests package
+RUN mvn -q -e -DskipTests package
 
 
 # ============================
-# 2. Runtime leve
+# 2. Runtime
 # ============================
 FROM eclipse-temurin:25-jre
 
