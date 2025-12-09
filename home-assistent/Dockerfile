@@ -1,7 +1,7 @@
 # ============================
 # 1. Build (JDK 24)
 # ============================
-FROM eclipse-temurin:25-jdk-jammy AS build
+FROM maven:3.9.11-eclipse-temurin-25-alpine AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN mvn -q -e -DskipTests package
 # ============================
 # 2. Runtime (JRE 25)
 # ============================
-FROM eclipse-temurin:25-jre-jammy
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
