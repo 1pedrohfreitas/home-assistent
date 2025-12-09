@@ -20,8 +20,8 @@ String senhaSalva = "";
 
 
 String wsHostSalvo = "";
-int wsPortSalvo = 0;
 String userId = "";
+String deviceId = "";
 
 unsigned long tempoInicial;
 bool jaConectadoSTA = false;
@@ -29,7 +29,7 @@ bool jaConectadoSTA = false;
 // ====================================================================
 // SALVAR / CARREGAR EEPROM
 // ====================================================================
-void salvarCredenciais(String ssid, String senha, String wsHost, int wsPort) {
+void salvarCredenciais(String ssid, String senha, String wsHost, String userId, String deviceId) {
 
   // SSID
   EEPROM.write(0, ssid.length());
@@ -39,16 +39,21 @@ void salvarCredenciais(String ssid, String senha, String wsHost, int wsPort) {
   EEPROM.write(33, senha.length());
   for (int i = 0; i < senha.length(); i++) EEPROM.write(34 + i, senha[i]);
 
-  // WS HOST
+  // HOST
   EEPROM.write(64, wsHost.length());
   for (int i = 0; i < wsHost.length(); i++) EEPROM.write(65 + i, wsHost[i]);
 
-  // WS PORT (2 bytes)
-  EEPROM.write(100, (wsPort >> 8) & 0xFF);
-  EEPROM.write(101, wsPort & 0xFF);
+  // USER ID
+  EEPROM.write(100, userId.length());
+  for (int i = 0; i < userId.length(); i++) EEPROM.write(101 + i, userId[i]);
+
+  // DEVICE ID
+  EEPROM.write(115, deviceId.length());
+  for (int i = 0; i < deviceId.length(); i++) EEPROM.write(116 + i, deviceId[i]);
 
   EEPROM.commit();
 }
+
 
 void carregarCredenciais() {
 
@@ -62,14 +67,22 @@ void carregarCredenciais() {
   senhaSalva = "";
   for (int i = 0; i < senhaLen; i++) senhaSalva += char(EEPROM.read(34 + i));
 
-  // WS HOST
+  // HOST
   int wsHostLen = EEPROM.read(64);
   wsHostSalvo = "";
   for (int i = 0; i < wsHostLen; i++) wsHostSalvo += char(EEPROM.read(65 + i));
 
-  // WS PORT
-  wsPortSalvo = (EEPROM.read(100) << 8) | EEPROM.read(101);
+  // USER ID
+  int uidLen = EEPROM.read(100);
+  userId = "";
+  for (int i = 0; i < uidLen; i++) userId += char(EEPROM.read(101 + i));
+
+  // DEVICE ID
+  int didLen = EEPROM.read(115);
+  deviceId = "";
+  for (int i = 0; i < didLen; i++) deviceId += char(EEPROM.read(116 + i));
 }
+
 
 // ====================================================================
 // ACCESS POINT
@@ -85,32 +98,86 @@ void iniciarAP() {
 void iniciarServidor() {
   server.on("/", HTTP_GET, []() {
     String html =
-      "<html><body>"
-      "<h2>Configurar WiFi - "+userId+"</h2>"
-      "<form method='POST' action='/save'>"
-      "SSID:<br><input name='ssid'><br>"
-      "Senha:<br><input name='pass' type='password'><br>"
-      "<br><h3>WebSocket</h3>"
-      "Host:<br><input name='wshost'><br>"
-      "Porta:<br><input name='wsport' type='number'><br><br>"
-      "<button type='submit'>Salvar</button>"
-      "</form>"
-      "</body></html>";
+      "<!DOCTYPE html>"
+      "<html lang='pt-BR'>"
+      "<head>"
+      "<meta charset='utf-8' />"
+      "<meta name='viewport' content='width=device-width,initial-scale=1' />"
+      "<title>Configurações — Home Assistant</title>"
+      "<style>"
+      ":root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#7c5cff;--accent-2:#00d4ff;--glass:rgba(255,255,255,0.04);--radius:14px;--gap:16px;--shadow:0 6px 30px rgba(2,6,23,0.6);--success:#22c55e;}"
+      "*{box-sizing:border-box}"
+      "html,body{height:100%}"
+      "body{margin:0;font-family:Inter,sans-serif;background:var(--bg);color:#e6eef8;display:flex;align-items:center;justify-content:center;padding:32px;}"
+      ".card{width:100%;max-width:920px;background:var(--glass);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow);border:1px solid rgba(255,255,255,0.05);display:grid;grid-template-columns:1fr;gap:24px;}"
+      "h1{margin:0;font-size:22px;}"
+      "label{font-size:13px;color:var(--muted);margin-bottom:6px;display:block}"
+      "input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px;}"
+      "fieldset{border-radius:12px;border:1px solid rgba(255,255,255,0.05);padding:16px;background:var(--glass);}"
+      "legend{padding:0 8px;font-weight:600;color:var(--accent);font-size:13px;}"
+      "button{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#051225;border:none;padding:12px 16px;border-radius:10px;font-weight:700;cursor:pointer;width:100%;}"
+      "</style>"
+      "</head>"
+      "<body>"
+      "<main class='card'>"
+      "<h1>Configurar Dispositivo</h1>"
+      "<form action='/save' method='post'>"
+
+      "<fieldset>"
+      "<legend>Conexão Wireless</legend>"
+      "<label>SSID</label>"
+      "<input type='text' name='ssid' value='"
+      + ssidSalvo + "'>"
+                    "<label>Senha</label>"
+                    "<input type='password' name='pass' value='"
+      + senhaSalva + "'>"
+                     "</fieldset>"
+
+                     "<fieldset>"
+                     "<legend>Conexão Servidor</legend>"
+                     "<label>Host + Porta + Path</label>"
+                     "<input type='text' name='wshost' value='"
+      + wsHostSalvo + "'>"
+                      "</fieldset>"
+
+                      "<fieldset>"
+                      "<legend>Identificação</legend>"
+                      "<label>User ID</label>"
+                      "<input type='text' name='userid' value='"
+      + userId + "'>"
+                 "<label>Device ID</label>"
+                 "<input type='text' name='deviceid' disabled value='"
+      + deviceId + "'>"
+                   "</fieldset>"
+
+                   "<button type='submit'>Salvar Configurações</button>"
+                   "</form>"
+                   "</main>"
+                   "</body>"
+                   "</html>";
 
     server.send(200, "text/html", html);
   });
 
-  server.on("/save", HTTP_POST, []() {
 
+
+  server.on("/save", HTTP_POST, []() {
     String s1 = server.arg("ssid");
     String s2 = server.arg("pass");
     String wsh = server.arg("wshost");
-    int wsp = server.arg("wsport").toInt();
+    String uid = server.arg("userid");
+    String did = server.arg("deviceid");
 
-    salvarCredenciais(s1, s2, wsh, wsp);
+    if (s1 != ssidSalvo || s2 != senhaSalva || wsh != wsHostSalvo || uid != userId || did != deviceId) {
 
-    server.send(200, "text/html", "Salvo! Reinicie o dispositivo.");
+      salvarCredenciais(s1, s2, wsh, uid, did);
+    }
+
+    server.send(200, "text/html",
+                "<h2>Configurações Salvas!</h2><p>Reinicie o dispositivo.</p>");
   });
+
+
 
   server.on("/sysinfo", HTTP_GET, []() {
     StaticJsonDocument<64> doc;
@@ -217,23 +284,59 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
 
 void conectarWS() {
 
-  if (wsHostSalvo.length() == 0 || wsPortSalvo == 0) {
+  if (wsHostSalvo.length() == 0) {
     Serial.println("WS não configurado.");
     return;
   }
 
-  String path = "/ws?userId=" + userId;
+  String url = wsHostSalvo;
 
-  Serial.print("Conectando WSS em: ");
-  Serial.print(wsHostSalvo);
-  Serial.print(":");
-  Serial.println(wsPortSalvo);
+  bool secure = url.startsWith("wss://");
+  url.replace("wss://", "");
+  url.replace("ws://", "");
 
- ws.beginSSL(wsHostSalvo.c_str(), wsPortSalvo, path.c_str());
+  int idxPort = url.indexOf(':');
+  int idxPath = url.indexOf('/');
 
+  if (idxPort < 0) {
+    Serial.println("URL inválida: falta porta");
+    return;
+  }
+
+  String host = url.substring(0, idxPort);
+  String portStr;
+  String path;
+
+  // ======================================
+  // Caso NÃO tenha path → usar "/"
+  // ======================================
+  if (idxPath == -1) {
+    portStr = url.substring(idxPort + 1);
+    path = "/";
+  } else {
+    portStr = url.substring(idxPort + 1, idxPath);
+    path = url.substring(idxPath); 
+  }
+
+  int port = portStr.toInt();
+
+  // Adiciona userId e deviceId no final do path
+  if (path.indexOf('?') == -1) {
+    path += "ws?userId=" + userId + "&deviceId=" + deviceId;
+  } else {
+    path += "&userId=" + userId + "&deviceId=" + deviceId;
+  }
+
+  Serial.println("HOST: " + host);
+  Serial.println("PORT: " + String(port));
+  Serial.println("PATH: " + path);
+
+  ws.begin(host.c_str(), port, path.c_str(), secure ? "wss" : "ws");
   ws.onEvent(webSocketEvent);
   ws.setReconnectInterval(5000);
 }
+
+
 
 // ====================================================================
 // SETUP
@@ -256,9 +359,7 @@ void setup() {
   digitalWrite(OUTPUT_4, HIGH);
 
   iniciarAP();
-        userId = getDeviceId();
-      Serial.println("DeviceID:");
-      Serial.println(userId);
+  deviceId = getDeviceId();
   iniciarServidor();
 
   tempoInicial = millis();
@@ -279,10 +380,6 @@ void loop() {
       Serial.println("Trocando para STA...");
       WiFi.mode(WIFI_STA);
       delay(100);
-
-      userId = getDeviceId();
-      Serial.println("DeviceID:");
-      Serial.println(userId);
       WiFi.begin(ssidSalvo.c_str(), senhaSalva.c_str());
 
       unsigned long t = millis();
@@ -290,7 +387,7 @@ void loop() {
         if (WiFi.status() == WL_CONNECTED) {
           Serial.println("Conectado ao WiFi!");
           Serial.println(WiFi.localIP());
-
+          deviceId = getDeviceId();
           jaConectadoSTA = true;
           conectarWS();
           break;
